@@ -15,6 +15,10 @@
 
 #include "HD44780U.h"
 
+typedef unsigned char Byte;
+
+Byte ISRF = 0x00;	// ISR Flag
+
 void wait(int ms)
 {
 	int i;
@@ -26,25 +30,17 @@ void wait(int ms)
 
 ISR(TIMER2_COMP_vect)
 {
-	TCCR2 = 0x00; // Disable clock source
-	TCNT2 = OCR2; // Correct overshooting
-	int n = TCNT2;
-	char n_str[4];
-	sprintf(n_str, "%03d", n);
-	LCD_set_cursor(10);
-	LCD_display_text(n_str);
+	//TCCR2 = 0x00; // Disable clock source
+	//TCNT2 = OCR2; // Correct overshooting
 	OCR2++; // Raise compare value;
-	TCCR2 = 0x07; // Enable clock source
+	ISRF |= 0x01; // Enable ISR flag0
+	//TCCR2 = 0x07; // Enable clock source
 }
 
 ISR(TIMER2_OVF_vect)
 {
 	OCR2 = 0; // Set compare back to 0
-	LCD_set_cursor(0);
-	LCD_display_text("#NOLIFE");
-	wait(100);
-	LCD_set_cursor(0);
-	LCD_display_text("#Presses: 000");
+	ISRF |= 0x02; // Enable ISR flag1
 }
 
 int main(void)
@@ -62,6 +58,24 @@ int main(void)
 	sei(); // Enable global interrupts
 	while (1)
 	{
-		// Keep it running
+		// Handle ISR
+		if ((ISRF & 0x01) != 0)
+		{
+			int n = TCNT2;
+			char n_str[4];
+			sprintf(n_str, "%03d", n);
+			LCD_set_cursor(10);
+			LCD_display_text(n_str);
+			ISRF &= ~0x01;
+		}
+		if ((ISRF & 0x02) != 0)
+		{
+			LCD_set_cursor(0);
+			LCD_display_text("#NOLIFE      ");
+			wait(1000);
+			LCD_set_cursor(0);
+			LCD_display_text("#Presses: 000");
+			ISRF &= ~0x02;
+		}
 	}
 }
